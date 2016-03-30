@@ -5,6 +5,8 @@ import org.apache.spark.rdd.RDD
 
 import com.redislabs.provider.redis.rdd._
 
+import redis.clients.jedis.Pipeline
+
 /**
   * RedisContext extends sparkContext's functionality with redis functions
   * @param sc a spark context
@@ -105,6 +107,18 @@ class RedisContext(@transient val sc: SparkContext) extends Serializable {
     (implicit redisConfig: RedisConfig = new RedisConfig(new RedisEndpoint(sc.getConf))) {
 
     vs.foreachPartition(partition => setFixedList(listName, listSize, partition, redisConfig))
+  }
+  
+  /**
+    * @param vs       RDD of values
+    * @param listName target list's name which hold all the vs
+    * @param listSize target list's size
+    *                 save all the vs to listName(list type) in redis-server
+    */
+  def toRedisMultiOperations(kvs: RDD[(String, String)], key: String, ttl: Int = 0,
+                       operations: Map[String,Map[String, String]])
+    (implicit redisConfig: RedisConfig = new RedisConfig(new RedisEndpoint(sc.getConf))) {
+    kvs.foreachPartition(partition => setMultiOperations(key,partition, redisConfig,operations))
   }
 
 }
@@ -218,6 +232,37 @@ object RedisContext extends Serializable {
     }
     pipeline.sync
     jedis.close
+  }
+  
+   /**
+    * @param key
+    * @param listSize
+    * @param arr values which should be saved in the target host
+    *            save all the values to listName(list type) to the target host
+    */
+  def setMultiOperations(key:String, arr: Iterator[(String, String)],
+                   redisConfig: RedisConfig,operations: Map[String,Map[String,String]]) {
+    val jedis = redisConfig.connectionForKey(key)
+    val pipeline = jedis.pipelined
+    arr.foreach(x => operations.keysIterator.foreach(y => setMultiFunctions(key, x, pipeline, y, operations.get(y).head)))
+    pipeline.sync
+    jedis.close
+  }
+  
+  /**
+   * @param key 
+   * @param vab Tuple2 for the data in each record in each partition
+   * @param pipeliner is the Redis Pipeline
+   * @param operation is the Redis Function in the Pipeline 
+   * @param config is the Map[String, String]
+   */
+  def setMultiFunctions(key: String,vab: Tuple2[String,String], pipeliner: Pipeline, operation: String, config: Map[String,String]){
+    if (operation.equalsIgnoreCase("zadd"))
+      pipeliner.zadd(key, vab._2.toDouble, vab._1)
+    else if(operation.equalsIgnoreCase("incr"))
+      pipeliner.incr(key)
+    else if(operation.equals("incrBy"))
+      pipeliner.incrBy(key, config.get("value").head.toLong)
   }
 }
 
