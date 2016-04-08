@@ -75,7 +75,6 @@ class RedisContext(@transient val sc: SparkContext) extends Serializable {
   
   /**
     * @param kvs      Pair RDD of K/V
-    * @param zsetName target zset's name which hold all the kvs
     * @param ttl time to live
     */
   def toRedisMultikeyZSET(kvs: RDD[(String, Iterator[(String,String)])], ttl: Int = 0)
@@ -83,10 +82,21 @@ class RedisContext(@transient val sc: SparkContext) extends Serializable {
 
     kvs.foreach(partition => setMultikeyZset(partition, ttl, redisConfig))
   }
-  
+
+  /**
+   *
+   * @param kvs RDD of Key Value pairs
+   * @param ttl time to live for key
+   * @param redisConfig redis config
+   * @return
+   */
+  def toRedisMultikeySet(kvs: RDD[(String, Iterator[(String, String)])], ttl: Int = 0)
+                        (implicit redisConfig: RedisConfig = new RedisConfig(new RedisEndpoint(sc.getConf))) {
+    kvs.foreach(partition => setMultikeySet(partition, ttl, redisConfig))
+  }
+
   /**
     * @param kvs      Pair RDD of K/V
-    * @param zsetName target zset's name which hold all the kvs
     * @param ttl time to live
     */
   def toRedisMultikeyZSETWithIncrByValue(kvs: RDD[(String, Iterator[(String,String)])], ttl: Int = 0,value: Int)
@@ -133,8 +143,6 @@ class RedisContext(@transient val sc: SparkContext) extends Serializable {
   
   /**
     * @param vs       RDD of values
-    * @param listName target list's name which hold all the vs
-    * @param listSize target list's size
     *                 save all the vs to listName(list type) in redis-server
     */
   def toRedisIncrBy(vs: RDD[String],
@@ -143,12 +151,12 @@ class RedisContext(@transient val sc: SparkContext) extends Serializable {
     vs.foreach(unit => setIncrBy(unit, value, redisConfig))
   }
   
-  /**
-    * @param vs       RDD of values
-    * @param listName target list's name which hold all the vs
-    * @param listSize target list's size
-    *                 save all the vs to listName(list type) in redis-server
-    */
+//  /**
+//    * @param vs       RDD of values
+//    * @param listName target list's name which hold all the vs
+//    * @param listSize target list's size
+//    *                 save all the vs to listName(list type) in redis-server
+//    */
   /*def toRedisMultiOperations(kvs: RDD[(String, Object, Object)], ttl: Int = 0,
                        operations: Map[String,Map[String, String]])
     (implicit redisConfig: RedisConfig = new RedisConfig(new RedisEndpoint(sc.getConf))) {
@@ -217,22 +225,35 @@ object RedisContext extends Serializable {
   }
   
   /**
-    * @param zsetName
     * @param arr k/vs which should be saved in the target host
     *            save all the k/vs to zsetName(zset type) to the target host
     * @param ttl time to live
     */
   def setMultikeyZset(arr: (String,Iterator[(String, String)]), ttl: Int, redisConfig: RedisConfig) {
-      val jedis = redisConfig.connectionForKey(arr._1)
-      val pipeline = jedis.pipelined
-      arr._2.foreach(y => pipeline.zadd(arr._1, y._2.toDouble, y._1))
-      if (ttl > 0) pipeline.expire(arr._1, ttl)
-      pipeline.sync
-      jedis.close
+    val jedis = redisConfig.connectionForKey(arr._1)
+    val pipeline = jedis.pipelined
+    arr._2.foreach(y => pipeline.zadd(arr._1, y._2.toDouble, y._1))
+    if (ttl > 0) pipeline.expire(arr._1, ttl)
+    pipeline.sync
+    jedis.close
   }
-  
+
+  /**
+   *
+   * @param arr Array of RDD data
+   * @param ttl time to live for key
+   * @param redisConfig redis config
+   */
+  def setMultikeySet(arr: (String, Iterator[(String, String)]), ttl: Int, redisConfig: RedisConfig) {
+    val jedis = redisConfig.connectionForKey(arr._1)
+    val pipeline = jedis.pipelined
+    arr._2.foreach(y => pipeline.sadd(arr._1, y._1))
+    if (ttl > 0) pipeline.expire(arr._1, ttl)
+    pipeline.sync
+    jedis.close
+  }
+
    /**
-    * @param zsetName
     * @param arr k/vs which should be saved in the target host
     *            save all the k/vs to zsetName(zset type) to the target host
     * @param ttl time to live
@@ -309,12 +330,12 @@ object RedisContext extends Serializable {
   
   
   
-   /**
-    * @param key
-    * @param listSize
-    * @param arr values which should be saved in the target host
-    *            save all the values to listName(list type) to the target host
-    */
+//   /**
+//    * @param key
+//    * @param listSize
+//    * @param arr values which should be saved in the target host
+//    *            save all the values to listName(list type) to the target host
+//    */
   /*def setMultiOperations(arr: Iterator[(String, Object, Object)], ttl: Int,
                    redisConfig: RedisConfig,operations: Map[String,Map[String,String]]) {
     arr.foreach(x => setMultiInner(x, ttl, redisConfig, operations))
@@ -323,9 +344,7 @@ object RedisContext extends Serializable {
   
   
   /**
-   * @param key 
-   * @param vab Tuple2 for the data in each record in each partition
-   * @param pipeliner is the Redis Pipeline
+   * @param key
    * @param operation is the Redis Function in the Pipeline 
    * @param config is the Map[String, String]
    */
