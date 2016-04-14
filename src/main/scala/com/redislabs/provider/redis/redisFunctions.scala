@@ -90,20 +90,11 @@ class RedisContext(@transient val sc: SparkContext) extends Serializable {
    * @param redisConfig redis config
    * @return
    */
-  def toRedisMultikeySet(kvs: RDD[(String, Iterator[(String, String)])], ttl: Int = 0)
+  def toRedisMultikeySet(kvs: RDD[(String, Iterator[String])], ttl: Int = 0)
                         (implicit redisConfig: RedisConfig = new RedisConfig(new RedisEndpoint(sc.getConf))) {
     kvs.foreach(partition => setMultikeySet(partition, ttl, redisConfig))
   }
 
-  /**
-    * @param kvs      Pair RDD of K/V
-    * @param ttl time to live
-    */
-  def toRedisMultikeyZSETWithIncrByValue(kvs: RDD[(String, Iterator[(String,String)])], ttl: Int = 0,value: Int)
-    (implicit redisConfig: RedisConfig = new RedisConfig(new RedisEndpoint(sc.getConf))) {
-
-    kvs.foreach(partition => setMultikeyZsetWithIncrByValue(partition, ttl, redisConfig,value))
-  }
 
   /**
     * @param vs      RDD of values
@@ -145,26 +136,12 @@ class RedisContext(@transient val sc: SparkContext) extends Serializable {
     * @param vs       RDD of values
     *                 save all the vs to listName(list type) in redis-server
     */
-  def toRedisIncrBy(vs: RDD[String],
-                       value: Int)
+  def toRedisIncrBy(vs: RDD[String], value: Int)
     (implicit redisConfig: RedisConfig = new RedisConfig(new RedisEndpoint(sc.getConf))) {
     vs.foreach(unit => setIncrBy(unit, value, redisConfig))
   }
-  
-//  /**
-//    * @param vs       RDD of values
-//    * @param listName target list's name which hold all the vs
-//    * @param listSize target list's size
-//    *                 save all the vs to listName(list type) in redis-server
-//    */
-  /*def toRedisMultiOperations(kvs: RDD[(String, Object, Object)], ttl: Int = 0,
-                       operations: Map[String,Map[String, String]])
-    (implicit redisConfig: RedisConfig = new RedisConfig(new RedisEndpoint(sc.getConf))) {
-    kvs.foreachPartition(partition => setMultiOperations(partition, ttl, redisConfig,operations))
-  }*/
 
 }
-
 
 
 object RedisContext extends Serializable {
@@ -199,7 +176,8 @@ object RedisContext extends Serializable {
     *            save all the k/vs to hashName(list type) to the target host
     * @param ttl time to live
     */
-  def setHash(hashName: String, arr: Iterator[(String, String)], ttl: Int, redisConfig: RedisConfig) {
+  def setHash(hashName: String, arr: Iterator[(String, String)],
+              ttl: Int, redisConfig: RedisConfig) {
 
     val conn = redisConfig.connectionForKey(hashName)
     val pipeline = conn.pipelined
@@ -215,7 +193,8 @@ object RedisContext extends Serializable {
     *            save all the k/vs to zsetName(zset type) to the target host
     * @param ttl time to live
     */
-  def setZset(zsetName: String, arr: Iterator[(String, String)], ttl: Int, redisConfig: RedisConfig) {
+  def setZset(zsetName: String, arr: Iterator[(String, String)],
+              ttl: Int, redisConfig: RedisConfig) {
     val jedis = redisConfig.connectionForKey(zsetName)
     val pipeline = jedis.pipelined
     arr.foreach(x => pipeline.zadd(zsetName, x._2.toDouble, x._1))
@@ -229,7 +208,8 @@ object RedisContext extends Serializable {
     *            save all the k/vs to zsetName(zset type) to the target host
     * @param ttl time to live
     */
-  def setMultikeyZset(arr: (String,Iterator[(String, String)]), ttl: Int, redisConfig: RedisConfig) {
+  def setMultikeyZset(arr: (String,Iterator[(String, String)]),
+                      ttl: Int, redisConfig: RedisConfig) {
     val jedis = redisConfig.connectionForKey(arr._1)
     val pipeline = jedis.pipelined
     arr._2.foreach(y => pipeline.zadd(arr._1, y._2.toDouble, y._1))
@@ -244,29 +224,15 @@ object RedisContext extends Serializable {
    * @param ttl time to live for key
    * @param redisConfig redis config
    */
-  def setMultikeySet(arr: (String, Iterator[(String, String)]), ttl: Int, redisConfig: RedisConfig) {
+  def setMultikeySet(arr: (String, Iterator[String]),
+                     ttl: Int, redisConfig: RedisConfig) {
     val jedis = redisConfig.connectionForKey(arr._1)
     val pipeline = jedis.pipelined
-    arr._2.foreach(y => pipeline.sadd(arr._1, y._1))
+    arr._2.foreach(y => pipeline.sadd(arr._1, y))
     if (ttl > 0) pipeline.expire(arr._1, ttl)
     pipeline.sync
     jedis.close
   }
-
-   /**
-    * @param arr k/vs which should be saved in the target host
-    *            save all the k/vs to zsetName(zset type) to the target host
-    * @param ttl time to live
-    */
-  def setMultikeyZsetWithIncrByValue(arr: (String,Iterator[(String, String)]), ttl: Int, redisConfig: RedisConfig,value: Int) {
-      val jedis = redisConfig.connectionForKey(arr._1)
-      val pipeline = jedis.pipelined
-      arr._2.foreach(y => {pipeline.zadd(arr._1, y._2.toDouble, y._1);pipeline.incrBy(arr._1, value)})
-      if (ttl > 0) pipeline.expire(arr._1, ttl)
-      pipeline.sync
-      jedis.close
-  }
- 
 
   /**
     * @param setName
@@ -274,7 +240,8 @@ object RedisContext extends Serializable {
     *            save all the values to setName(set type) to the target host
     * @param ttl time to live
     */
-  def setSet(setName: String, arr: Iterator[String], ttl: Int, redisConfig: RedisConfig) {
+  def setSet(setName: String, arr: Iterator[String],
+             ttl: Int, redisConfig: RedisConfig) {
 
     val jedis = redisConfig.connectionForKey(setName)
     val pipeline = jedis.pipelined
@@ -290,7 +257,8 @@ object RedisContext extends Serializable {
     *            save all the values to listName(list type) to the target host
     * @param ttl time to live
     */
-  def setList(listName: String, arr: Iterator[String], ttl: Int, redisConfig: RedisConfig) {
+  def setList(listName: String, arr: Iterator[String],
+              ttl: Int, redisConfig: RedisConfig) {
 
     val jedis = redisConfig.connectionForKey(listName)
     val pipeline = jedis.pipelined
@@ -306,7 +274,9 @@ object RedisContext extends Serializable {
     * @param arr values which should be saved in the target host
     *            save all the values to listName(list type) to the target host
     */
-  def setFixedList(key: String, listSize: Int, arr: Iterator[String],
+  def setFixedList(key: String,
+                   listSize: Int,
+                   arr: Iterator[String],
                    redisConfig: RedisConfig) {
 
     val jedis = redisConfig.connectionForKey(key)
@@ -319,39 +289,31 @@ object RedisContext extends Serializable {
     jedis.close
   }
   
-  def setIncrBy(key: String, value: Int=1,
-                   redisConfig: RedisConfig) {
+  def setIncrBy(key: String,
+                value: Int=1,
+                redisConfig: RedisConfig) {
     val jedis = redisConfig.connectionForKey(key)
     val pipeline = jedis.pipelined
     pipeline.incrBy(key, value)
     pipeline.sync
     jedis.close
   }
-  
-  
-  
-//   /**
-//    * @param key
-//    * @param listSize
-//    * @param arr values which should be saved in the target host
-//    *            save all the values to listName(list type) to the target host
-//    */
-  /*def setMultiOperations(arr: Iterator[(String, Object, Object)], ttl: Int,
-                   redisConfig: RedisConfig,operations: Map[String,Map[String,String]]) {
-    arr.foreach(x => setMultiInner(x, ttl, redisConfig, operations))
-  }*/
-  
-  
-  
+
+
   /**
-   * @param key
-   * @param operation is the Redis Function in the Pipeline 
+   * @param key redis key
+   * @param operation is the Redis Function in the Pipeline
    * @param config is the Map[String, String]
    */
-  def setMultiFunctions(key: String,vab1: Object,vab2: Object, pipeline: Pipeline,operation: String, config: Map[String,String]){
+  def setMultiFunctions(key: String,
+                        vab1: Object,
+                        vab2: Object,
+                        pipeline: Pipeline,
+                        operation: String,
+                        config: Map[String,String]){
     
     if (operation.equalsIgnoreCase("zadd"))
-      pipeline.zadd(key, vab2.toString().toDouble, vab1.toString())
+      pipeline.zadd(key, vab2.toString.toDouble, vab1.toString)
     else if(operation.equalsIgnoreCase("incr"))
       pipeline.incr(key)
     else if(operation.equalsIgnoreCase("incrBy"))
