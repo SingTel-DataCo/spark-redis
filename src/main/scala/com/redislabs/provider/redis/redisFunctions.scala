@@ -9,6 +9,7 @@ import redis.clients.jedis.Pipeline
 
 /**
   * RedisContext extends sparkContext's functionality with redis functions
+  *
   * @param sc a spark context
   */
 class RedisContext(@transient val sc: SparkContext) extends Serializable {
@@ -163,15 +164,15 @@ object RedisContext extends Serializable {
         else {
           x._2.foreach(x => pipeline.setex(x._1, ttl, x._2))
         }
-        pipeline.sync
-        conn.close
+        pipeline.sync()
+        conn.close()
       }
     }
   }
 
 
   /**
-    * @param hashName
+    * @param hashName redis hash name
     * @param arr k/vs which should be saved in the target host
     *            save all the k/vs to hashName(list type) to the target host
     * @param ttl time to live
@@ -183,12 +184,12 @@ object RedisContext extends Serializable {
     val pipeline = conn.pipelined
     arr.foreach(x => pipeline.hset(hashName, x._1, x._2))
     if (ttl > 0) pipeline.expire(hashName, ttl)
-    pipeline.sync
-    conn.close
+    pipeline.sync()
+    conn.close()
   }
 
   /**
-    * @param zsetName
+    * @param zsetName redis sorted set name
     * @param arr k/vs which should be saved in the target host
     *            save all the k/vs to zsetName(zset type) to the target host
     * @param ttl time to live
@@ -199,8 +200,8 @@ object RedisContext extends Serializable {
     val pipeline = jedis.pipelined
     arr.foreach(x => pipeline.zadd(zsetName, x._2.toDouble, x._1))
     if (ttl > 0) pipeline.expire(zsetName, ttl)
-    pipeline.sync
-    jedis.close
+    pipeline.sync()
+    jedis.close()
   }
   
   /**
@@ -214,8 +215,8 @@ object RedisContext extends Serializable {
     val pipeline = jedis.pipelined
     arr._2.foreach(y => pipeline.zadd(arr._1, y._2.toDouble, y._1))
     if (ttl > 0) pipeline.expire(arr._1, ttl)
-    pipeline.sync
-    jedis.close
+    pipeline.sync()
+    jedis.close()
   }
 
   /**
@@ -230,12 +231,12 @@ object RedisContext extends Serializable {
     val pipeline = jedis.pipelined
     arr._2.foreach(y => pipeline.sadd(arr._1, y))
     if (ttl > 0) pipeline.expire(arr._1, ttl)
-    pipeline.sync
-    jedis.close
+    pipeline.sync()
+    jedis.close()
   }
 
   /**
-    * @param setName
+    * @param setName set name
     * @param arr values which should be saved in the target host
     *            save all the values to setName(set type) to the target host
     * @param ttl time to live
@@ -247,12 +248,12 @@ object RedisContext extends Serializable {
     val pipeline = jedis.pipelined
     arr.foreach(pipeline.sadd(setName, _))
     if (ttl > 0) pipeline.expire(setName, ttl)
-    pipeline.sync
-    jedis.close
+    pipeline.sync()
+    jedis.close()
   }
 
   /**
-    * @param listName
+    * @param listName list name
     * @param arr values which should be saved in the target host
     *            save all the values to listName(list type) to the target host
     * @param ttl time to live
@@ -264,13 +265,13 @@ object RedisContext extends Serializable {
     val pipeline = jedis.pipelined
     arr.foreach(pipeline.rpush(listName, _))
     if (ttl > 0) pipeline.expire(listName, ttl)
-    pipeline.sync
-    jedis.close
+    pipeline.sync()
+    jedis.close()
   }
 
   /**
-    * @param key
-    * @param listSize
+    * @param key redis key
+    * @param listSize list size
     * @param arr values which should be saved in the target host
     *            save all the values to listName(list type) to the target host
     */
@@ -285,8 +286,8 @@ object RedisContext extends Serializable {
     if (listSize > 0) {
       pipeline.ltrim(key, 0, listSize - 1)
     }
-    pipeline.sync
-    jedis.close
+    pipeline.sync()
+    jedis.close()
   }
   
   def setIncrBy(key: String,
@@ -295,8 +296,8 @@ object RedisContext extends Serializable {
     val jedis = redisConfig.connectionForKey(key)
     val pipeline = jedis.pipelined
     pipeline.incrBy(key, value)
-    pipeline.sync
-    jedis.close
+    pipeline.sync()
+    jedis.close()
   }
 
 
@@ -311,14 +312,14 @@ object RedisContext extends Serializable {
                         pipeline: Pipeline,
                         operation: String,
                         config: Map[String,String]){
-    
-    if (operation.equalsIgnoreCase("zadd"))
+
+    if (operation.equalsIgnoreCase("zadd")) {
       pipeline.zadd(key, vab2.toString.toDouble, vab1.toString)
-    else if(operation.equalsIgnoreCase("incr"))
+    } else if(operation.equalsIgnoreCase("incr")) {
       pipeline.incr(key)
-    else if(operation.equalsIgnoreCase("incrBy"))
+    } else if(operation.equalsIgnoreCase("incrBy")) {
       pipeline.incrBy(key, config.get("value").head.toLong)
-    
+    }
   }
 }
 
