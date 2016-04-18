@@ -134,12 +134,12 @@ class RedisContext(@transient val sc: SparkContext) extends Serializable {
   }
   
   /**
-    * @param vs       RDD of values
+    * @param kvs       RDD of values
     *                 save all the vs to listName(list type) in redis-server
     */
-  def toRedisIncrBy(vs: RDD[String], value: Int)
+  def toRedisIncrBy(kvs: RDD[(String, String)])
     (implicit redisConfig: RedisConfig = new RedisConfig(new RedisEndpoint(sc.getConf))) {
-    vs.foreach(unit => setIncrBy(unit, value, redisConfig))
+    kvs.foreach(kv => setIncrBy(kv._1, kv._2.toInt, redisConfig))
   }
 
 }
